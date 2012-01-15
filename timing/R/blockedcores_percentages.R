@@ -1,0 +1,25 @@
+data <- read.csv(inputfile,header=TRUE,sep=";")
+
+trimmedmean <- function(x) {
+	return <- mean(x, trim=0.10)
+	#return <- mean(x)
+}
+
+datamean <- aggregate(data,by=list(data$Cores,data$Blocked.Cores,data$Workpakets,data$Input.Size),FUN=trimmedmean)
+
+inputsizes <- unique(datamean$Input.Size)
+blockedcores <- unique(datamean$Blocked.Cores)
+
+# get percentages for each input size and number of blocked cores
+str <- ""
+for (size in inputsizes) {
+	str <- paste(c(str, "Inputsize: ", size, ":\n"),collapse="")
+	for (bcs in blockedcores) {
+		data <- datamean[which(datamean$Input.Size == size & datamean$Blocked.Cores == bcs),]
+		percent <- round(data$Time.MCSTL*100/data$Time-100)
+		str <- paste(c(str, percent, "%  "),collapse="")
+	}
+	str <- paste(c(str, "\n\n"),collapse="")
+}
+writeLines(str)
+

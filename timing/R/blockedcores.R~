@@ -1,0 +1,31 @@
+
+data <- read.csv(inputfile,header=TRUE,sep=";")
+
+trimmedmean <- function(x) {
+	#return <- mean(x, trim=0.10)
+	return <- mean(x)
+}
+
+datamean <- aggregate(data,by=list(data$Cores,data$Blocked.Cores,data$Workpakets,data$Input.Size),FUN=trimmedmean)
+
+inputsizes <- unique(datamean$Input.Size)
+cores <- unique(datamean$Cores)
+blockedcores <- unique(datamean$Blocked.Cores)
+
+
+# plot running time while cores are blocked
+par(mfrow=c(2,4))
+for (size in inputsizes) {
+	plotdata <- datamean[which(datamean$Input.Size == size & datamean$Cores == 8),]
+	x <- blockedcores
+	my <- plotdata$Time
+	mcstl <- plotdata$Time.MCSTL
+	plot(NaN,xlim=c(min(blockedcores),max(blockedcores)),ylim=c(min(my,mcstl),max(my,mcstl)),xlab="Blocked Cores",ylab="Abs Time",main=paste(c("Blocked Cores, Input Size: ",size)))
+	
+	lines(x,my,col="blue",type="o")
+	lines(x,mcstl,col="red",type="o")
+	
+	perfect<-plotdata[which(x==0),]$Time*max(cores)/(max(cores):(max(cores)-max(blockedcores)))
+	perfect2<-plotdata[which(x==max(blockedcores)),]$Time/(max(cores):(max(cores)-max(blockedcores)))
+	lines(x,perfect2,col="grey",type="o")
+}
