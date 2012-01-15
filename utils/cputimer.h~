@@ -31,7 +31,7 @@ class CPUTimer {
 		}
 		
 		// Returns time in microseconds
-		uint64_t getTimeMicro() {
+		long long getTimeMicro() {
 			return measured_time;
 		}
 		
