@@ -12,11 +12,17 @@
  *				Target PID is defined via commandline argument.
  */
  
+// defines weather information is send to MALMS or not
+#define SENDINFO 1
+#define BLOCK_CYCLE_MICROSEC 100000L;
+ 
 // exec and fork
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
+#include <vector>
 #include <cstring>
 #include <iostream>
 
@@ -53,10 +59,12 @@
 std::vector<boost::thread*> threads;
 std::vector<boost::condition_variable*> thread_cd;
 std::vector<boost::mutex*> thread_mutex;
-std::vector<std::atomic<bool>> thread_active;
-std::vector<std::atomic<bool>> thread_quit;
-std::vector<std::atomic<int>> thread_work_counter;
+std::atomic<bool>* thread_active;
+std::atomic<bool>* thread_quit;
+std::atomic<int>* thread_work_counter;
 std::atomic<int> numthreads_sleeping;
+std::atomic<bool> quit;
+std::atomic<pid_t> pidofsort;
 
 void pin_to_core(int cpuid) {
 	cpu_set_t set;
@@ -73,13 +81,23 @@ void set_max_prio() {
 	sched_setparam(0, &para);
 }
 
+void block_all_signals() {
+	sigset_t sigset;
+	sigfillset(&sigset);
+	pthread_sigmask(SIG_BLOCK, &sigset, NULL);
+}
+
 void dowork() {
-	for (int i = 0; i < 10000000; i++) {
-		// loop
+	unsigned int c = 0;
+	for (unsigned int i = 0; i < 1000; i++) {
+		// non memory intensive work
+		// cannot be optimized by compiler
+		c = ++c % 13;
 	}
 }
 
 void thread_func(int coreid) {
+	block_all_signals();
 	pin_to_core(coreid);
 	set_max_prio();
 	int work_counter = 0;
@@ -113,19 +131,86 @@ void thread_func(int coreid) {
 	}
 }
 
-void loadcore(int coreid) {
-	boost::unique_lock<boost::mutex> lock(*thread_mutex[coreid]);
-	thread_active[coreid] = true;
-	thread_cd[coreid]->notify_all();
+void loadcore(int coreid, pid_t pid) {
+	#ifdef SENDINFO
+	union sigval value;
+	value.sival_int = coreid;
+	sigqueue(pid, SIGRTMIN+1, value);
+	#endif
+	{
+		boost::unique_lock<boost::mutex> lock(*thread_mutex[coreid]);
+		thread_active[coreid] = true;
+		thread_cd[coreid]->notify_all();
+	}
 }
 
-void unloadcore(int coreid) {
-	boost::unique_lock<boost::mutex> lock(*thread_mutex[coreid]);
-	thread_active[coreid] = false;
+void unloadcore(int coreid, pid_t pid) {
+	{
+		boost::unique_lock<boost::mutex> lock(*thread_mutex[coreid]);
+		thread_active[coreid] = false;
+	}
+	#ifdef SENDINFO
+	union sigval value;
+	value.sival_int = coreid;
+	sigqueue(pid, SIGRTMIN+2, value);
+	#endif
+}
+
+void waitforpidandexit(pid_t pid) {
+	waitpid(pid, NULL, 0);
+	exit(0);
 }
 
 void handler(int signum) {
 	// dont do much :)
+}
+
+void controlthreadfunc() {
+	set_max_prio();
+	// set signal masks
+	struct sigaction act;
+	act.sa_handler = &handler;
+	sigaction(SIGSTARTBLOCKCORES, &act, NULL);
+	sigset_t mask;
+	sigfillset(&mask);
+	sigdelset(&mask,SIGSTARTBLOCKCORES);
+
+	// prepare time struct for sleep
+	long sleep_intervall = BLOCK_CYCLE_MICROSEC;
+	struct timespec req;
+	req.tv_sec = 0;
+	req.tv_nsec = sleep_intervall;
+
+	// wait for signal 'Start Block Cores' from timesortfile
+	sigsuspend(&mask);
+	
+	// get pid
+	pid_t pid = pidofsort;
+	
+	
+	// start blocking cores
+	loadcore(0, pid);
+	//loadcore(1, pid);
+	
+	while (true) {
+		loadcore(1, pid);
+		nanosleep(&req,NULL);
+		//if (quit) return;
+		loadcore(2, pid);
+		unloadcore(1, pid);
+		nanosleep(&req,NULL);
+		//if (quit) return;
+		unloadcore(0, pid);
+		loadcore(3, pid);
+		loadcore(1, pid);
+		nanosleep(&req,NULL);
+		//if (quit) return;
+		unloadcore(3, pid);
+		unloadcore(2, pid);
+		nanosleep(&req,NULL);
+		if (quit) return;
+	}
+	
 }
 
 int main(int argc, char* argv[]) {
@@ -141,38 +226,41 @@ int main(int argc, char* argv[]) {
 	argv_sort[argc-1] = spid;
 	argv_sort[argc] = argv[argc-1];
 	
+	/*
 	// echo sort parameters
 	for (int i = 0; i < argc+2; i++) {
 		std::cout << argv_sort[i] << " ";
 	}
 	std::cout << std::endl;
-	
-	// set signal masks
-	struct sigaction act;
-	act.sa_handler = &handler;
-	sigaction(SIGSTARTBLOCKCORES, &act, NULL);
-	sigset_t mask;
-	sigfillset(&mask);
-	sigdelset(&mask,SIGSTARTBLOCKCORES);
+	*/
+
 	
 	// init thread/synchronization variables
 	int p = boost::thread::hardware_concurrency();
 	threads = std::vector<boost::thread*>(p,NULL);
 	thread_cd = std::vector<boost::condition_variable*>(p,NULL);
 	thread_mutex = std::vector<boost::mutex*>(p,NULL);
-	thread_active = std::vector<std::atomic<bool>>(p);
-	thread_quit = std::vector<std::atomic<bool>>(p);
-	thread_work_counter = std::vector<std::atomic<int>>(p);
+	thread_active = new std::atomic<bool>[p];
+	thread_quit = new std::atomic<bool>[p];
+	thread_work_counter = new std::atomic<int>[p];
 	numthreads_sleeping = 0;
+	quit = false;
+	pidofsort = 0;
+	
+	// start control thread
+	boost::thread control_thread(&controlthreadfunc);
 	
 	// init mutexes and cond-vars and start threads
 	for (unsigned int i = 0; i < p; i++) {
 		thread_cd[i] = new boost::condition_variable();
 		thread_mutex[i] = new boost::mutex();
 		thread_active[i] = false;
+		thread_work_counter[i] = 0;
 		thread_quit[i] = false;
 		threads[i] = new boost::thread(&thread_func, i);
 	}
+	
+	block_all_signals();
 	
 	// wait for all threads to be ready and sleeping
 	while (numthreads_sleeping < p) {
@@ -182,9 +270,12 @@ int main(int argc, char* argv[]) {
 		nanosleep(&req, NULL);
 	}
 	
+
+	
 	// call timesortfile with arguments provided
 	//pid_t pid = 1;
 	pid_t pid = fork();
+	pidofsort = pid;
 	if (pid == -1) {
 		std::cout << "fork() failed" << std::endl;
 		exit(1);
@@ -194,23 +285,34 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	
-	// wait for signal 'Start Block Cores' from timesortfile
-	sigsuspend(&mask);
+	// wait for sorting to be finished
+	waitpid(pid, NULL, 0);
+	// quit all threads
+	quit = true;
+	for (unsigned int i = 0; i < p; i++) {
+		thread_quit[i] = true;
+		if (!thread_active[i]) {
+			{
+				boost::unique_lock<boost::mutex> lock(*thread_mutex[i]);
+				thread_cd[i]->notify_all();
+			}
+		} else {
+			thread_active[i] = false;
+		}
+	}
 	
-	// start blocking cores
-	long sleep_intervall = 100000L;
-	struct timespec req;
-	req.tv_sec = 5;
-	req.tv_nsec = sleep_intervall;
+	for (unsigned int i = 0; i < p; i++) {
+		threads[i]->join();
+	}
+	control_thread.join();
 	
-	loadcore(0);
-	loadcore(1);
-	nanosleep(&req,NULL);
-	loadcore(2);
-	unloadcore(1);
-	nanosleep(&req,NULL);
-	unloadcore(0);
-	loadcore(3);
-	loadcore(1);
-	nanosleep(&req,NULL);
+	// get sum of work counters
+	unsigned long long aggr_work_counter = 0;
+	for (unsigned int i = 0; i < p; i++) {
+		aggr_work_counter += thread_work_counter[i];
+	}
+	// print number of work done
+	std::cout << ";" << aggr_work_counter;
+	
+	return 0;
 }

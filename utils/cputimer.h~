@@ -7,7 +7,8 @@
 #ifndef CPU_TIMER_H
 #define CPU_TIMER_H
 
-#include<time.h>
+#include<sys/time.h>
+#include <stdint.h>
 //#include<sys/timeb.h>
 
 class CPUTimer {
@@ -31,7 +32,7 @@ class CPUTimer {
 		}
 		
 		// Returns time in microseconds
-		long long getTimeMicro() {
+		uint64_t getTimeMicro() {
 			return measured_time;
 		}
 		

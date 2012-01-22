@@ -8,6 +8,7 @@
 #define CPU_TIMER_H
 
 #include<time.h>
+#include <stdint.h>
 //#include<sys/timeb.h>
 
 class CPUTimer {
