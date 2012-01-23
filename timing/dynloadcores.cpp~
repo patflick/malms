@@ -15,6 +15,8 @@
 // defines weather information is send to MALMS or not
 #define SENDINFO 1
 #define BLOCK_CYCLE_MICROSEC 100000L;
+#define ARG_INFO "info"
+#define ARG_NOINFO "noinfo"
  
 // exec and fork
 #include <unistd.h>
@@ -65,6 +67,9 @@ std::atomic<int>* thread_work_counter;
 std::atomic<int> numthreads_sleeping;
 std::atomic<bool> quit;
 std::atomic<pid_t> pidofsort;
+std::atomic<int> p;
+std::atomic<bool> send_info;
+std::atomic<long long> block_cycle_nanosec;
 
 void pin_to_core(int cpuid) {
 	cpu_set_t set;
@@ -176,7 +181,7 @@ void controlthreadfunc() {
 	sigdelset(&mask,SIGSTARTBLOCKCORES);
 
 	// prepare time struct for sleep
-	long sleep_intervall = BLOCK_CYCLE_MICROSEC;
+	long sleep_intervall = block_cycle_nanosec;
 	struct timespec req;
 	req.tv_sec = 0;
 	req.tv_nsec = sleep_intervall;
@@ -195,40 +200,73 @@ void controlthreadfunc() {
 	while (true) {
 		loadcore(1, pid);
 		nanosleep(&req,NULL);
-		//if (quit) return;
+		if (quit) break;
 		loadcore(2, pid);
 		unloadcore(1, pid);
 		nanosleep(&req,NULL);
-		//if (quit) return;
+		if (quit) break;
 		unloadcore(0, pid);
 		loadcore(3, pid);
 		loadcore(1, pid);
 		nanosleep(&req,NULL);
-		//if (quit) return;
+		if (quit) break;
 		unloadcore(3, pid);
 		unloadcore(2, pid);
 		nanosleep(&req,NULL);
-		if (quit) return;
+		if (quit) break;
 	}
 	
+	// quit working threads
+	// has to be done here to prevent deadlock
+	for (unsigned int i = 0; i < p; i++) {
+		thread_quit[i] = true;
+		if (!thread_active[i]) {
+			{
+				boost::unique_lock<boost::mutex> lock(*thread_mutex[i]);
+				thread_cd[i]->notify_all();
+			}
+		} else {
+			thread_active[i] = false;
+		}
+	}
 }
 
+
+// usage: ./dynloadcores [info/noinfo] [Cyles in NanoSecs] ./timesortfile [SORT OPTIONS]
 int main(int argc, char* argv[]) {
-	// prepare arguments for call of "timesortfile"
-	char* argv_sort[argc+2];
-	argv_sort[argc+1] = NULL;
-	for (int i = 1; i < argc-1; i++) {
-		argv_sort[i-1] = argv[i];
+	// read input arguments
+	if (strcmp(argv[1],ARG_INFO)==0) {
+		send_info = true;
+	} else if (strcmp(argv[1],ARG_NOINFO)==0) {
+		send_info = false;
+	} else {
+		std::cout << "Wrong Usage, you are doing it wrong!" << std::endl;
+		return 0;
 	}
-	argv_sort[argc-2] = "-p";
+	
+	block_cycle_nanosec = atol(argv[2]);
+	if (block_cycle_nanosec == 0) {
+		std::cout << "Wrong Usage, you are doing it wrong!" << std::endl;
+		return 0;
+	}
+
+	// prepare arguments for call of "timesortfile"
+	int argc_sort = argc-1;
+	char* argv_sort[argc_sort+1];
+	argv_sort[argc_sort] = NULL;
+	for (int i = 3; i < argc-1; i++) {
+		argv_sort[i-3] = argv[i];
+	}
+	argv_sort[argc_sort-3] = "-p";
 	char spid[6];
 	sprintf(spid, "%u", getpid()); 
-	argv_sort[argc-1] = spid;
-	argv_sort[argc] = argv[argc-1];
+	argv_sort[argc_sort-2] = spid;
+	argv_sort[argc_sort-1] = argv[argc-1];
 	
-	/*
+	
 	// echo sort parameters
-	for (int i = 0; i < argc+2; i++) {
+	/*
+	for (int i = 0; i < argc_sort; i++) {
 		std::cout << argv_sort[i] << " ";
 	}
 	std::cout << std::endl;
@@ -236,7 +274,7 @@ int main(int argc, char* argv[]) {
 
 	
 	// init thread/synchronization variables
-	int p = boost::thread::hardware_concurrency();
+	p = boost::thread::hardware_concurrency();
 	threads = std::vector<boost::thread*>(p,NULL);
 	thread_cd = std::vector<boost::condition_variable*>(p,NULL);
 	thread_mutex = std::vector<boost::mutex*>(p,NULL);
@@ -280,27 +318,16 @@ int main(int argc, char* argv[]) {
 		std::cout << "fork() failed" << std::endl;
 		exit(1);
 	} else if (pid == 0) {
-		execv(argv[1],argv_sort);
+		execv(argv[3],argv_sort);
 		std::cout << "execv() failed" << std::endl;
 		exit(1);
 	}
 	
 	// wait for sorting to be finished
 	waitpid(pid, NULL, 0);
+	
 	// quit all threads
 	quit = true;
-	for (unsigned int i = 0; i < p; i++) {
-		thread_quit[i] = true;
-		if (!thread_active[i]) {
-			{
-				boost::unique_lock<boost::mutex> lock(*thread_mutex[i]);
-				thread_cd[i]->notify_all();
-			}
-		} else {
-			thread_active[i] = false;
-		}
-	}
-	
 	for (unsigned int i = 0; i < p; i++) {
 		threads[i]->join();
 	}

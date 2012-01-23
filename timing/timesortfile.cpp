@@ -116,19 +116,7 @@ int main(int argc, char* argv[]) {
 	data = reinterpret_cast<int*>(chardata);
 	unsigned long long n = filesize >> 2;
 	
-	// prepare threadpool
-	Scheduler::MaleableScheduler* sched = Scheduler::MaleableScheduler::singleton();
-	Scheduler::WorkQueue* queue = sched->newJob();
-	if (c == 0) {
-		sched->scheduleToAll(queue);
-	} else {
-		sched->scheduleToFirst(queue, c);
-	}
-	
-	// give signal that preparation is done
-	if (pid != 0) {
-		kill(pid, SIGSTARTBLOCKCORES);
-	}
+
 	
 	// prepare timing function
 	CPUTimer timer;
@@ -136,15 +124,35 @@ int main(int argc, char* argv[]) {
 	// start sorting with the correct algorithm
 	if (a == MCSTL_MWMS) {
 		timer.start();
+		// give signal that preparation is done
+		if (pid != 0) {
+			kill(pid, SIGSTARTBLOCKCORES);
+		}
 		__gnu_parallel::parallel_sort_mwms<false,true>(data,data+n,std::less<int>(),k); 
 		timer.stop();
 		
 	} else if (a == MALMS) {
 		timer.start();
+		// prepare threadpool
+		Scheduler::MaleableScheduler* sched = Scheduler::MaleableScheduler::singleton();
+		Scheduler::WorkQueue* queue = sched->newJob();
+		if (c == 0) {
+			sched->scheduleToAll(queue);
+		} else {
+			sched->scheduleToFirst(queue, c);
+		}
+		// give signal that preparation is done
+		if (pid != 0) {
+			kill(pid, SIGSTARTBLOCKCORES);
+		}
 		malms::sort(data,data+n,k,queue);
 		timer.stop();
 	} else if (a == STDSORT) {
 		timer.start();
+		// give signal that preparation is done
+		if (pid != 0) {
+			kill(pid, SIGSTARTBLOCKCORES);
+		}
 		std::sort(data,data+n);
 		timer.stop();
 	}

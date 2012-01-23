@@ -25,8 +25,13 @@ if [ -n "$1" ]; then
 	WP=$1
 fi
 
+BLOCK_CYCLE_MICROSEC=100
+if [ -n "$2" ]; then
+	BLOCK_CYCLE_MICROSEC=$2
+fi
+
 # Outputfile for the timing data
-OUTPUTNAME=dynload_new_100µs_wp$WP\_info.csv
+OUTPUTNAME=dynload_new_$BLOCK_CYCLE_MICROSECµs_wp$WP\_info.csv
 
 # Number of Repitions of the Tests
 REPEAT=10
@@ -45,7 +50,7 @@ OUTPUT=$DATA_DIR/$OUTPUTNAME
 #                 Prepare Output File
 # ------------------------------------------------------- #
 echo -n "" > $OUTPUT
- echo "Cores;Input.Size;Time;Loops.MALMS;Time.MCSTL;Loops.MCSTL;Workpakets" >> $OUTPUT
+ echo "Cores;Input.Size;Time.MALMS.Info;Loops.MALMS.Info;Time.MALMS.NoInfo;Loops.MALMS.NoInfo;Time.MCSTL;Loops.MCSTL;Workpakets" >> $OUTPUT
 
 # ------------------------------------------------------- #
 #                  Begin of Script
@@ -53,7 +58,7 @@ echo -n "" > $OUTPUT
 
 for ((size=$MIN_INPUT_SIZE; size<=$MAX_INPUT_SIZE; size*=10))
 do
-	echo -n "=== Input Size $size ==="
+	echo  "=== Input Size $size ==="
 
 
 	# Generate Sorting input
@@ -62,25 +67,28 @@ do
 
 	for ((cores=$MIN_CORES; cores<=$MAX_CORES; cores++))
 	do
-		echo " --> $cores Cores: "
+		echo -n " --> $cores Cores: "
 
 		for ((i=0; i<$REPEAT; i++))
 		do
 			# Preparing new csv row
 			echo -n "$cores;$size;" >> $OUTPUT
-			for algo in malms mcstl
+			for algo in malmsinfo malmsnoinfo mcstl
 			do
 				# Starting Process that waits for the Signal from the Sort Process
 				$UTILS_DIR/waitforsignal &
 				PID_OF_WAIT=$!
 				
 				malmscores=$cores
+				BlockNS=$((1000*$BLOCK_CYCLE_MICROSEC))
 				
 				# Start Sorting Process
 				if [ "$algo" = "mcstl" ]; then
-					./dynloadcores ./timesortfile -k $cores -a $algo input.data >> $OUTPUT &
-				else
-					./dynloadcores ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
+					./dynloadcores noinfo $BlockNS ./timesortfile -k $cores -a $algo input.data >> $OUTPUT &
+				elif [ "$algo" = "malmsinfo" ]; then
+					./dynloadcores info $BlockNS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
+				elif [ "$algo" = "malmsnoinfo" ]; then
+					./dynloadcores noinfo $BlockNS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
 				fi
 				PID_OF_SORT=$!
 

@@ -1,5 +1,5 @@
-inputfile <- "../data/dynload_new_100µs_wp48_info.csv"
-inputfile_noinfo <- "../data/dynload_noinfo_50µs_wp100.csv"
+inputfile <- "../data/dynload_new_100µs_wp48_noinfo.csv"
+inputfile_noinfo <- "../data/dynload_new_100µs_wp48_info.csv"
 data <- read.csv(inputfile,header=TRUE,sep=";")
 data_noinfo <- read.csv(inputfile_noinfo,header=TRUE,sep=";")
 
