@@ -80,15 +80,18 @@ do
 				PID_OF_WAIT=$!
 				
 				malmscores=$cores
-				BlockNS=$((1000*$BLOCK_CYCLE_MICROSEC))
+				BlockNanoS=$((1000*$BLOCK_CYCLE_MICROSEC))
 				
 				# Start Sorting Process
 				if [ "$algo" = "mcstl" ]; then
-					./dynloadcores noinfo $BlockNS ./timesortfile -k $cores -a $algo input.data >> $OUTPUT &
+					#echo "./dynloadcores noinfo $BlockNanoS ./timesortfile -k $cores -a mcstl input.data"
+					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $cores -a $algo input.data >> $OUTPUT &
 				elif [ "$algo" = "malmsinfo" ]; then
-					./dynloadcores info $BlockNS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
+					#echo "./dynloadcores info $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data"
+					./dynloadcores info $BlockNanoS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
 				elif [ "$algo" = "malmsnoinfo" ]; then
-					./dynloadcores noinfo $BlockNS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
+					#echo "./dynloadcores noinfo $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data"
+					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
 				fi
 				PID_OF_SORT=$!
 

@@ -84,11 +84,14 @@ do
 				
 				# Start Sorting Process
 				if [ "$algo" = "mcstl" ]; then
-					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $cores -a $algo input.data >> $OUTPUT &
+					#echo "./dynloadcores noinfo $BlockNanoS ./timesortfile -k $cores -a mcstl input.data"
+					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $cores -a mcstl input.data >> $OUTPUT &
 				elif [ "$algo" = "malmsinfo" ]; then
-					./dynloadcores info $BlockNanoS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
+					#echo "./dynloadcores info $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data"
+					./dynloadcores info $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data >> $OUTPUT &
 				elif [ "$algo" = "malmsnoinfo" ]; then
-					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
+					#echo "./dynloadcores noinfo $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data"
+					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data >> $OUTPUT &
 				fi
 				PID_OF_SORT=$!
 
