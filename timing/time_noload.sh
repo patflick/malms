@@ -45,7 +45,7 @@ OUTPUT=$DATA_DIR/$OUTPUTNAME
 #                 Prepare Output File
 # ------------------------------------------------------- #
 echo -n "" > $OUTPUT
- echo "Cores;Input Size;Time;Time MCSTL;Workpakets" >> $OUTPUT
+ echo "Cores;Input.Size;Time.MALMS;Time.MCSTL;Time.STDSORT;Workpakets" >> $OUTPUT
 
 # ------------------------------------------------------- #
 #                  Begin of Script
@@ -68,7 +68,7 @@ do
 		do
 			# Preparing new csv row
 			echo -n "$cores;$size;" >> $OUTPUT
-			for algo in malms mcstl
+			for algo in malms mcstl stdsort
 			do
 				# Starting Process that waits for the Signal from the Sort Process
 				$UTILS_DIR/waitforsignal &
@@ -79,8 +79,10 @@ do
 				# Start Sorting Process
 				if [ "$algo" = "mcstl" ]; then
 					./timesortfile -k $cores -a $algo -p $PID_OF_WAIT input.data >> $OUTPUT &
-				else
+				elif [ "$algo" = "malms" ]; then
 					./timesortfile -k $WP -c $malmscores -a $algo -p $PID_OF_WAIT input.data >> $OUTPUT &
+				elif [ "$algo" = "stdsort" ]; then
+					./timesortfile -k $cores -a $algo -p $PID_OF_WAIT input.data >> $OUTPUT &
 				fi
 				PID_OF_SORT=$!
 

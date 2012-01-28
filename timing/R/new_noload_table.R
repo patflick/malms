@@ -1,0 +1,56 @@
+# settings
+wp_for_all <- 8
+wps_for_malms <- c(8,24,48)
+
+# functions
+trimmedmean <- function(x) {
+	return <- mean(x, trim=0.10)
+	#return <- mean(x)
+}
+loaddata <- function(wp) {
+	inputfile <- paste(c("../data/noload_wp",wp,".csv"),collapse="")
+	data <- read.csv(inputfile,header=TRUE,sep=";")
+	data <- aggregate(data,by=list(data$Cores,data$Workpakets,data$Input.Size),FUN=trimmedmean)
+}
+
+
+data <- loaddata(wp_for_all)
+
+# string operations creating tex code
+inputsizes <- unique(datamean$Input.Size)
+
+tblcols <- c(0)
+length(tblcols) <- length(inputsizes) + 1
+tblcols[1:length(tblcols)] <- "l"
+str_tblbegin <- paste(tblcols,collapse="|")
+
+str <- paste(c("\\begin{tabular}{",str_tblbegin,"}\n"),collapse="")
+str_hdr_input <- paste("$10^",log(inputsizes,base=10), "$",collapse="	& ",sep="")
+str_hdr <- paste(c("Input Size	& ",str_hdr_input," \\\\\n\\hline\n\\hline\n\n"),collapse="")
+str <- paste(c(str,str_hdr),collapse="")
+
+# std sort:
+str_stdsort <- paste(round(data$Time.STDSORT,digits=5),collapse="	& ", sep="")
+str <- paste(c(str,"STDSORT	& ",str_stdsort,"\\\\\n\\hline\n\n"),collapse="")
+
+# mcstl
+str_mcstl <- paste(round(data$Time.MCSTL,digits=5),collapse="	& ", sep="")
+str <- paste(c(str,"MCSTL		& ", str_mcstl,"\\\\\n"),collapse="")
+
+# mcstl speedup
+str_mcstl <- paste(round(data$Time.STDSORT/data$Time.MCSTL,digits=2),collapse="	& ", sep="")
+str <- paste(c(str,"MCSTL SU	& ", str_mcstl,"\\\\\n\\hline\n\n"),collapse="")
+
+# malms k=8
+for (wp in wps_for_malms) {
+data <- loaddata(wp)
+str_malms <- paste(round(data$Time.MALMS,digits=5),collapse="	& ", sep="")
+str <- paste(c(str,"MALMS $k=",wp,"$	& ", str_malms,"\\\\\n"),collapse="")
+
+str_malms <- paste(round(data$Time.STDSORT/data$Time.MALMS,digits=2),collapse="	& ", sep="")
+str <- paste(c(str,"MALMS $k=",wp,"$ SU	& ", str_malms,"\\\\\n\\hline\n\n"),collapse="")
+}
+
+str <- paste(c(str, "\\end{tabular}\n\n"),collapse="")
+writeLines(str)
+

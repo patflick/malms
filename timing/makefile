@@ -11,6 +11,11 @@ all: timesortfile
 timesortfile:  timesortfile.cpp $(SORT_LIB) $(UTILS_LIB)
 		cd ../utils; make all; cd ../timing
 		$(CC) timesortfile.cpp -o timesortfile $(LIBS) $(OPTIMIZATION_LVL)
+		
+# timing via data input and core blocking
+timesortfile_phases:  timesortfile.cpp $(SORT_LIB) $(UTILS_LIB)
+		cd ../utils; make all; cd ../timing
+		$(CC) timesortfile.cpp -o timesortfile $(LIBS) $(OPTIMIZATION_LVL) -DTIMING_PHASES
 
 dynloadcores:	timesortfile dynloadcores.cpp $(SORT_LIB) $(UTILS_LIB)
 		cd ../utils; make all; cd ../timing

@@ -45,7 +45,9 @@ namespace malms {
 
 #ifdef TIMING_PHASES
 void outputTime(std::string name,double time) {
-	std::cout << "        " << name << ": " << time << " s" << std::endl;
+	//std::cout << "        " << name << ": " << time << " s" << std::endl;
+	std::cout << time << ";";
+	std::cout.flush();
 }
 #endif
 #ifdef TIMING_THREADS
@@ -196,7 +198,7 @@ void sort(_RandomAccessIterator begin,_RandomAccessIterator end, unsigned int nu
 	
 	#ifdef TIMING_PHASES
 	timer.stop();
-	outputTime("Copy",timer.getTime());
+	//outputTime("Copy",timer.getTime());
 	timer.start();
 	#endif
 	
@@ -211,7 +213,7 @@ void sort(_RandomAccessIterator begin,_RandomAccessIterator end, unsigned int nu
 	
 	#ifdef TIMING_PHASES
 	timer.stop();
-	outputTime("Cleanup",timer.getTime());
+	//outputTime("Cleanup",timer.getTime());
 	#endif
 }
 

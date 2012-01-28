@@ -1,0 +1,48 @@
+cycles <- c(100)
+wps <- c(48)
+
+
+for (cycle in cycles) {
+for (wp in wps) {
+	inputfile <- paste(c("../data/static_dynload_",cycle,"µs_wp",wp,".csv"), collapse="")
+
+	data <- read.csv(inputfile,header=TRUE,sep=";")
+
+	trimmedmean <- function(x) {
+		#return <- mean(x, trim=0.10)
+		return <- mean(x)
+	}
+
+	datamean <- aggregate(data,by=list(data$Cores,data$Workpakets,data$Input.Size),FUN=trimmedmean)
+
+	inputsizes <- unique(datamean$Input.Size)
+	
+	str <- paste(c("\\subsection*{",cycle,"µs cylce}\n","\\subsubsection*{k=",wp," Workpackets}\n","\\begin{tabular}{l|l|l|l|l|l|l|l|l}\n"),collapse="");
+	
+	str_hdr <- "N	& MALMS-I 	& MALMS-NI	& MCSTL		& Loops MALMS-I	& Loops MALMS-NI & Loops MCSTL & MALMS-I Adv	& MCSTL Adv		\\\\\n\\hline\n"
+	str <- paste(c(str,str_hdr),collapse="")
+	for (size in inputsizes) {
+		data <- datamean[which(datamean$Input.Size == size),]
+		# input size
+		str <- paste(c(str, "$10^",log(size,base=10),"$		& "),collapse="")
+		# execution times
+		str <- paste(c(str, round(data$Time.MALMS.Info,digits=6), "	& "),collapse="")
+		str <- paste(c(str, round(data$Time.MALMS.NoInfo,digits=6), "	& "),collapse="")
+		str <- paste(c(str, round(data$Time.MCSTL,digits=6), "	& "),collapse="")
+	
+		# loops while algos
+		str <- paste(c(str, round(data$Loops.MALMS.Info/1000000/data$Time.MALMS.Info,digits=6), "	& "),collapse="")
+		str <- paste(c(str, round(data$Loops.MALMS.NoInfo/1000000/data$Time.MALMS.NoInfo,digits=6), "	& "),collapse="")
+		str <- paste(c(str, round(data$Loops.MCSTL/1000000/data$Time.MCSTL,digits=6), "	& "),collapse="")
+	
+		# time advantages in %
+		str <- paste(c(str, round(100-data$Time.MALMS.Info*100/data$Time.MALMS.NoInfo,digits=1), "\\%  	& "),collapse="")	
+		str <- paste(c(str, round(100-data$Time.MCSTL*100/data$Time.MALMS.Info,digits=1), "\\% \\\\\n"),collapse="")
+
+	}
+	
+	str <- paste(c(str, "\\end{tabular}"),collapse="")
+	writeLines(str)
+	
+}
+}

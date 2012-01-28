@@ -2,8 +2,8 @@
 data <- read.csv(inputfile,header=TRUE,sep=";")
 
 trimmedmean <- function(x) {
-	#return <- mean(x, trim=0.10)
-	return <- mean(x)
+	return <- mean(x, trim=0.10)
+	#return <- mean(x)
 }
 
 datamean <- aggregate(data,by=list(data$Cores,data$Blocked.Cores,data$Workpakets,data$Input.Size),FUN=trimmedmean)
@@ -13,19 +13,21 @@ cores <- unique(datamean$Cores)
 blockedcores <- unique(datamean$Blocked.Cores)
 
 
+size = 1000000
 # plot running time while cores are blocked
-par(mfrow=c(2,4))
-for (size in inputsizes) {
-	plotdata <- datamean[which(datamean$Input.Size == size & datamean$Cores == 8),]
-	x <- blockedcores
-	my <- plotdata$Time
-	mcstl <- plotdata$Time.MCSTL
-	plot(NaN,xlim=c(min(blockedcores),max(blockedcores)),ylim=c(min(my,mcstl),max(my,mcstl)),xlab="Blocked Cores",ylab="Abs Time",main=paste(c("Blocked Cores, Input Size: ",size)))
+plotdata <- datamean[which(datamean$Input.Size == size & datamean$Cores == 8),]
+x <- blockedcores
+my <- plotdata$Time
+mcstl <- plotdata$Time.MCSTL
+plot(NaN,xlim=c(min(blockedcores),max(blockedcores)),ylim=c(min(my,mcstl),max(my,mcstl)),xlab="Blocked Cores",ylab="Abs Time",main=paste(c("Blocked Cores, Input Size: ",size)))
+
+lines(x,malms,type="o",col="blue",pch=1,lty=1)
+lines(x,mcstl,type="o",col="red",pch=4,lty=5)
 	
-	lines(x,my,col="blue",type="o")
-	lines(x,mcstl,col="red",type="o")
-	
-	perfect<-plotdata[which(x==0),]$Time*max(cores)/(max(cores):(max(cores)-max(blockedcores)))
-	perfect2<-plotdata[which(x==max(blockedcores)),]$Time/(max(cores):(max(cores)-max(blockedcores)))
-	lines(x,perfect2,col="grey",type="o")
-}
+perfect_speedup_malms<-plotdata[which(x==max(blockedcores)),]$Time/(max(cores):(max(cores)-max(blockedcores)))
+perfect_speedup_stl<-plotdata[which(x==max(blockedcores)),]$Time.MCSTL/(max(cores):(max(cores)-max(blockedcores)))
+
+lines(x,perfect_speedup_malms, type="o",col="forestgreen", pch=3, lty=6)
+
+legend("topleft", title="Algorithmen", c("MALMS", "STLMS", "PERFECT"),pch=c(1,4,3),lty=c(1,5,6),col=c("blue","red","forestgreen"))
+

@@ -31,7 +31,7 @@ if [ -n "$2" ]; then
 fi
 
 # Outputfile for the timing data
-OUTPUTNAME=dynload_new_$BLOCK_CYCLE_MICROSECµs_wp$WP\_info.csv
+OUTPUTNAME=static_dynload_$BLOCK_CYCLE_MICROSECµs_wp$WP\.csv
 
 # Number of Repitions of the Tests
 REPEAT=10
@@ -74,11 +74,7 @@ do
 			# Preparing new csv row
 			echo -n "$cores;$size;" >> $OUTPUT
 			for algo in malmsinfo malmsnoinfo mcstl
-			do
-				# Starting Process that waits for the Signal from the Sort Process
-				$UTILS_DIR/waitforsignal &
-				PID_OF_WAIT=$!
-				
+			do	
 				malmscores=$cores
 				BlockNanoS=$((1000*$BLOCK_CYCLE_MICROSEC))
 				

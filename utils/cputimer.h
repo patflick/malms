@@ -19,7 +19,7 @@ class CPUTimer {
 	
 		inline long long microsecsonds_ts() {
 			struct timespec ts;
-			clock_gettime(CLOCK_REALTIME, &ts);;
+			clock_gettime(CLOCK_REALTIME, &ts);
 			return (uint64_t)ts.tv_sec * 1000000LL + (uint64_t)ts.tv_nsec / 1000LL;
 		}
 	public:

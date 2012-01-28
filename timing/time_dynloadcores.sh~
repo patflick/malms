@@ -31,7 +31,7 @@ if [ -n "$2" ]; then
 fi
 
 # Outputfile for the timing data
-OUTPUTNAME=dynload_new_$BLOCK_CYCLE_MICROSECµs_wp$WP\_info.csv
+OUTPUTNAME=dynload_$BLOCK_CYCLE_MICROSECµs_wp$WP\.csv
 
 # Number of Repitions of the Tests
 REPEAT=10
@@ -74,24 +74,20 @@ do
 			# Preparing new csv row
 			echo -n "$cores;$size;" >> $OUTPUT
 			for algo in malmsinfo malmsnoinfo mcstl
-			do
-				# Starting Process that waits for the Signal from the Sort Process
-				$UTILS_DIR/waitforsignal &
-				PID_OF_WAIT=$!
-				
+			do	
 				malmscores=$cores
 				BlockNanoS=$((1000*$BLOCK_CYCLE_MICROSEC))
 				
 				# Start Sorting Process
 				if [ "$algo" = "mcstl" ]; then
 					#echo "./dynloadcores noinfo $BlockNanoS ./timesortfile -k $cores -a mcstl input.data"
-					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $cores -a $algo input.data >> $OUTPUT &
+					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $cores -a mcstl input.data >> $OUTPUT &
 				elif [ "$algo" = "malmsinfo" ]; then
 					#echo "./dynloadcores info $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data"
-					./dynloadcores info $BlockNanoS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
+					./dynloadcores info $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data >> $OUTPUT &
 				elif [ "$algo" = "malmsnoinfo" ]; then
 					#echo "./dynloadcores noinfo $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data"
-					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $WP -c $malmscores -a $algo input.data >> $OUTPUT &
+					./dynloadcores noinfo $BlockNanoS ./timesortfile -k $WP -c $malmscores -a malms input.data >> $OUTPUT &
 				fi
 				PID_OF_SORT=$!
 

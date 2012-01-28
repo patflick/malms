@@ -195,8 +195,13 @@ void controlthreadfunc() {
 	
 	// start blocking cores
 	loadcore(0, pid);
-	//loadcore(1, pid);
+	loadcore(1, pid);
+	while (true) {
+		nanosleep(&req,NULL);
+		if (quit) break;
+	}
 	
+	/*
 	while (true) {
 		loadcore(1, pid);
 		nanosleep(&req,NULL);
@@ -214,7 +219,7 @@ void controlthreadfunc() {
 		unloadcore(2, pid);
 		nanosleep(&req,NULL);
 		if (quit) break;
-	}
+	}*/
 	
 	// quit working threads
 	// has to be done here to prevent deadlock
@@ -324,13 +329,16 @@ int main(int argc, char* argv[]) {
 	}
 	
 	// wait for sorting to be finished
+	//std::cout << "waiting for sort pid" << std::endl;
 	waitpid(pid, NULL, 0);
 	
 	// quit all threads
 	quit = true;
 	for (unsigned int i = 0; i < p; i++) {
+		//std::cout << "waiting for work threads" << std::endl;
 		threads[i]->join();
 	}
+	//std::cout << "waiting for control threads" << std::endl;
 	control_thread.join();
 	
 	// get sum of work counters

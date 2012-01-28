@@ -1,3 +1,7 @@
+./time_noload.sh 8
+./time_noload.sh 24
+./time_noload.sh 48
+./time_noload.sh 100
 ./time_hotpluggedcores.sh 24
 ./time_hotpluggedcores.sh 48
 ./time_hotpluggedcores.sh 100

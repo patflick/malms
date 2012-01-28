@@ -28,9 +28,6 @@ fi
 # Outputfile for the timing data
 OUTPUTNAME=noload_wp$WP.csv
 
-# Number of Workpakets (MALMS) / Threads (MCSTL) to use
-WP=48
-
 # Number of Repitions of the Tests
 REPEAT=50
 
@@ -48,7 +45,7 @@ OUTPUT=$DATA_DIR/$OUTPUTNAME
 #                 Prepare Output File
 # ------------------------------------------------------- #
 echo -n "" > $OUTPUT
- echo "Cores;Input Size;Time;Time MCSTL;Workpakets" >> $OUTPUT
+ echo "Cores;Input.Size;Time.MALMS;Time.MCSTL;Time.STDSORT;Workpakets" >> $OUTPUT
 
 # ------------------------------------------------------- #
 #                  Begin of Script
@@ -82,8 +79,10 @@ do
 				# Start Sorting Process
 				if [ "$algo" = "mcstl" ]; then
 					./timesortfile -k $cores -a $algo -p $PID_OF_WAIT input.data >> $OUTPUT &
-				else
+				elif [ "$algo" = "malms" ]; then
 					./timesortfile -k $WP -c $malmscores -a $algo -p $PID_OF_WAIT input.data >> $OUTPUT &
+				elif [ "$algo" = "stdsort" ]; then
+					./timesortfile -k $cores -a $algo -p $PID_OF_WAIT input.data >> $OUTPUT &
 				fi
 				PID_OF_SORT=$!
 
