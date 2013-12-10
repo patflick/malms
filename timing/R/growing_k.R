@@ -15,6 +15,7 @@ wps <- unique(datamean$Workpakets)
 
 # plot running time while cores are blocked
 par(mfrow=c(2,3))
+par(cex=1)
 for (size in inputsizes) {
 	plotdata <- datamean[which(datamean$Input.Size == size),]
 	x <- wps
@@ -23,15 +24,24 @@ for (size in inputsizes) {
 	plot(NaN,xlim=c(min(x),max(x)),ylim=c(0,max(malms)),xlab="Workpackets k",ylab="Abs Time",main=paste(c("Blocked Cores, Input Size: ",size)))
 	
 	
+	
+	
 	xx <- c(wps, rev(wps))
-	yyTotal <- c(malms, rep(0,length(x)))
-	yySort <- c(plotdata$Time.Sorting, rep(0,length(x)))
-	yyMerge <- c(plotdata$Time.Merging+plotdata$Time.Sorting, rep(0,length(x)))
-	yySplit <- c(plotdata$Time.Merging+plotdata$Time.Splitting+plotdata$Time.Sorting, rep(0,length(x)))
+	sort <- plotdata$Time.Sorting
+	merge <- plotdata$Time.Merging+plotdata$Time.Sorting
+	split <- plotdata$Time.Merging+plotdata$Time.Splitting+plotdata$Time.Sorting
+	
+	
+	yySort <- c(sort, rep(0,length(x)))
+	yyMerge <- c(merge, rev(sort))
+	yySplit <- c(split, rev(merge))
+	yyTotal <- c(malms, rev(split))
 	
 	polygon(xx,yyTotal, col="grey")
-	polygon(xx,yySplit, col="#FFA200")
-	polygon(xx,yyMerge, col="#00BB3F")
-	polygon(xx,yySort, col="#7309AA")
+	polygon(xx,yySplit, col="#FFA200",density=15,lwd=3,angle=90)
+	polygon(xx,yyMerge, col="#00BB3F",density=15,lwd=3,angle=45)
+	polygon(xx,yySort, col="#7309AA",density=15,lwd=3,angle=-45)
+	
+	legend("topleft", title="Phases", c("Init Scheduler","Splitting","Merging", "Sorting"),fill=c("grey","#FFA200","#00BB3F", "#7309AA"),density=c(NaN,15,20,20),angle=c(NaN,90,45,-45))
 	#lines(x,malms,col="blue",type="o")
 }

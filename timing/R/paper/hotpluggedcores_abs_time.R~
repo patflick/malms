@@ -21,7 +21,7 @@ blockedcores <- unique(datamean$Blocked.Cores)
 
 
 # plot running time while cores are blocked
-size = 10000000
+size = 1000000
 png(outputfile,width=outputwidth,height=outputheight)
 par(cex=2.0)
 plotdata <- datamean[which(datamean$Input.Size == size & datamean$Cores == 8),]

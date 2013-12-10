@@ -28,7 +28,7 @@ plotdata <- datamean[which(datamean$Input.Size == size & datamean$Cores == 8),]
 x <- blockedcores
 malms <- plotdata$Time
 mcstl <- plotdata$Time.MCSTL
-plot(NaN,xlim=c(min(blockedcores),max(blockedcores)),ylim=c(min(malms,mcstl),max(malms,mcstl)),xlab="# Hotplugged Cores",ylab="Abs Time",main="Hotplugged cores")
+plot(NaN,xlim=c(min(blockedcores),max(blockedcores)),ylim=c(min(malms,mcstl),max(malms,mcstl)),xlab="# Hotplugged Cores",ylab="Running Time [s]",main="Hotplugged cores")
 	
 lines(x,malms,type="o",col="blue",pch=1,lty=1)
 lines(x,mcstl,type="o",col="red",pch=4,lty=5)
