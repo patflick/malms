@@ -1,5 +1,5 @@
 # Makefile for Maleable-Mergesort Testing and Timing
-LIBS = -lboost_thread-mt -fopenmp
+LIBS = -lboost_thread -lboost_system -fopenmp
 SORT_LIB = $(wildcard malms/*.cpp malms/*.h)
 UTILS_LIB = $(wildcard utils/*.cpp utils/*.h)
 OPTIMIZATION_LVL = -O2

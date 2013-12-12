@@ -22,6 +22,9 @@
 #include "../malms/threadpool_mergesort.h"
 #include "../malms/threadpool/maleablescheduler.h"
 
+//Intel TBB
+#include "tbb/parallel_sort.h"
+
 // signaling
 #include <signal.h>
 
@@ -37,9 +40,10 @@
 #define ARG_ALG_MCSTL "mcstl"
 #define ARG_ALG_MALMS "malms"
 #define ARG_ALG_STDSORT "stdsort"
+#define ARG_ALG_TBBSORT "tbbsort"
 
 // possible algorithms
-enum Algorithm {MCSTL_MWMS, MALMS, STDSORT};
+enum Algorithm {MCSTL_MWMS, MALMS, STDSORT, TBBSORT};
 
 
 void printUsage() {
@@ -69,6 +73,8 @@ int main(int argc, char* argv[]) {
 				a = MALMS;
 			} else if (strcmp(argv[i],ARG_ALG_STDSORT)==0) {
 				a = STDSORT;
+			} else if (strcmp(argv[i],ARG_ALG_TBBSORT)==0) {
+				a = TBBSORT;
 			} else {
 				printUsage();
 				return 0;
@@ -154,6 +160,14 @@ int main(int argc, char* argv[]) {
 			kill(pid, SIGSTARTBLOCKCORES);
 		}
 		std::sort(data,data+n);
+		timer.stop();
+	} else if (a == TBBSORT) {
+		timer.start();
+		// give signal that preparation is done
+		if (pid != 0) {
+			kill(pid, SIGSTARTBLOCKCORES);
+		}
+		tbb::parallel_sort(data,data+n);
 		timer.stop();
 	}
 

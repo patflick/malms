@@ -1,4 +1,5 @@
 # Makefile for Maleable-Mergesort Utils
+LIBS = -lboost_thread -lboost_system -fopenmp
 FLAGS = -O2
 CC = g++
 
@@ -11,7 +12,7 @@ sendblockcore: sendblockcore.cpp
 waitforsignal: waitforsignal.cpp
 		$(CC) waitforsignal.cpp -o waitforsignal $(FLAGS)
 loadcore: loadcore.cpp
-		$(CC) loadcore.cpp -o loadcore -lboost_thread-mt -O0
+		$(CC) loadcore.cpp -o loadcore $(LIBS) -O0
 		
 clean:
 		rm -f generatesortinput sendblockcore waitforsignal loadcore
