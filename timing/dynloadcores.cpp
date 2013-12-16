@@ -57,6 +57,11 @@
 // Signal to be waited on before loading cores
 #define SIGSTARTBLOCKCORES SIGRTMIN+4
 
+//Speicherparameter je 1000 ints
+#define ACKERGROESSE 10000
+#define PARZELLENGROESSE 25
+#define WIEDERHOLUNGEN 2
+
 
 std::vector<boost::thread*> threads;
 std::vector<boost::condition_variable*> thread_cd;
@@ -64,6 +69,7 @@ std::vector<boost::mutex*> thread_mutex;
 std::atomic<bool>* thread_active;
 std::atomic<bool>* thread_quit;
 std::atomic<int>* thread_work_counter;
+int** thread_acker;
 std::atomic<int> numthreads_sleeping;
 std::atomic<bool> quit;
 std::atomic<pid_t> pidofsort;
@@ -92,12 +98,13 @@ void block_all_signals() {
 	pthread_sigmask(SIG_BLOCK, &sigset, NULL);
 }
 
-void dowork() {
+void dowork(int z, int* acker) {
 	unsigned int c = 0;
 	for (unsigned int i = 0; i < 1000; i++) {
 		// non memory intensive work
 		// cannot be optimized by compiler
-		c = ++c % 13;
+		acker[z] = (++c + acker[z]) % 13;
+		z++;
 	}
 }
 
@@ -106,15 +113,15 @@ void thread_func(int coreid) {
 	pin_to_core(coreid);
 	set_max_prio();
 	int work_counter = 0;
+	int z = 0;
 	// waiting till rdy for work
 	{ // synchronized
 		boost::unique_lock<boost::mutex> lock(*thread_mutex[coreid]);
 		numthreads_sleeping++;
 		thread_cd[coreid]->wait(lock);
 	}
+	int* acker = thread_acker[coreid];
 	while (true) {
-		dowork();
-		work_counter++;
 		if (!thread_active[coreid]) {
 			if (thread_quit[coreid]) {
 				thread_work_counter[coreid] = work_counter;
@@ -131,6 +138,10 @@ void thread_func(int coreid) {
 				thread_work_counter[coreid] = work_counter;
 				return;
 			}
+		}else{
+			z=((work_counter % PARZELLENGROESSE) + (work_counter / (PARZELLENGROESSE*WIEDERHOLUNGEN))*PARZELLENGROESSE)%ACKERGROESSE;
+			dowork(1000*z, acker);
+			work_counter++;
 		}
 		
 	}
@@ -185,41 +196,56 @@ void controlthreadfunc() {
 	struct timespec req;
 	req.tv_sec = 0;
 	req.tv_nsec = sleep_intervall;
-
+	
 	// wait for signal 'Start Block Cores' from timesortfile
 	sigsuspend(&mask);
 	
 	// get pid
 	pid_t pid = pidofsort;
 	
-	
 	// start blocking cores
-	loadcore(0, pid);
 	loadcore(1, pid);
-	while (true) {
-		nanosleep(&req,NULL);
-		if (quit) break;
-	}
+	loadcore(2, pid);
+	//loadcore(4, pid);
+	//loadcore(6, pid);
+	//nanosleep(&req,NULL);
 	
-	/*
 	while (true) {
-		loadcore(1, pid);
+		
 		nanosleep(&req,NULL);
 		if (quit) break;
-		loadcore(2, pid);
+		
+	        loadcore(0, pid);
+		//loadcore(4, pid);
+		//unloadcore(3, pid);
+		//unloadcore(7, pid);
+		
+		nanosleep(&req,NULL);
+		if (quit) break;
+		
+		//loadcore(1, pid);
+		//loadcore(5, pid);
 		unloadcore(1, pid);
-		nanosleep(&req,NULL);
-		if (quit) break;
-		unloadcore(0, pid);
-		loadcore(3, pid);
-		loadcore(1, pid);
-		nanosleep(&req,NULL);
-		if (quit) break;
-		unloadcore(3, pid);
 		unloadcore(2, pid);
+		
 		nanosleep(&req,NULL);
 		if (quit) break;
-	}*/
+		
+		loadcore(1, pid);
+		loadcore(2, pid);
+		//loadcore(7, pid);
+		unloadcore(0, pid);
+		//unloadcore(5, pid);
+		
+		nanosleep(&req,NULL);
+		if (quit) break;
+		
+		//loadcore(3, pid);
+		//loadcore(7, pid);
+		//unloadcore(2, pid);
+		//unloadcore(6, pid);
+		//unloadcore(6, pid);
+	}
 	
 	// quit working threads
 	// has to be done here to prevent deadlock
@@ -254,7 +280,8 @@ int main(int argc, char* argv[]) {
 		std::cout << "Wrong Usage, you are doing it wrong!" << std::endl;
 		return 0;
 	}
-
+	
+	
 	// prepare arguments for call of "timesortfile"
 	int argc_sort = argc-1;
 	char* argv_sort[argc_sort+1];
@@ -267,7 +294,6 @@ int main(int argc, char* argv[]) {
 	sprintf(spid, "%u", getpid()); 
 	argv_sort[argc_sort-2] = spid;
 	argv_sort[argc_sort-1] = argv[argc-1];
-	
 	
 	// echo sort parameters
 	/*
@@ -286,10 +312,11 @@ int main(int argc, char* argv[]) {
 	thread_active = new std::atomic<bool>[p];
 	thread_quit = new std::atomic<bool>[p];
 	thread_work_counter = new std::atomic<int>[p];
+	thread_acker = new int*[p];
 	numthreads_sleeping = 0;
 	quit = false;
 	pidofsort = 0;
-	
+	int n = ACKERGROESSE*1000;
 	// start control thread
 	boost::thread control_thread(&controlthreadfunc);
 	
@@ -301,6 +328,10 @@ int main(int argc, char* argv[]) {
 		thread_work_counter[i] = 0;
 		thread_quit[i] = false;
 		threads[i] = new boost::thread(&thread_func, i);
+		
+		//erstelle Aecker
+		thread_acker[i] = new int[n];
+		for (int j=0;j<n;j++) thread_acker[i][j]=0;
 	}
 	
 	block_all_signals();
@@ -329,16 +360,14 @@ int main(int argc, char* argv[]) {
 	}
 	
 	// wait for sorting to be finished
-	//std::cout << "waiting for sort pid" << std::endl;
 	waitpid(pid, NULL, 0);
+	
 	
 	// quit all threads
 	quit = true;
 	for (unsigned int i = 0; i < p; i++) {
-		//std::cout << "waiting for work threads" << std::endl;
 		threads[i]->join();
 	}
-	//std::cout << "waiting for control threads" << std::endl;
 	control_thread.join();
 	
 	// get sum of work counters

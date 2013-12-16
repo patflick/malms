@@ -5,7 +5,7 @@ UTILS_LIB = $(wildcard ../utils/*.cpp ../utils/*.h)
 OPTIMIZATION_LVL = -O2
 CC = g++
 		
-all: timesortfile
+all: timesortfile dynloadcores
 		
 # timing via data input and core blocking
 timesortfile: timesortfile.cpp $(SORT_LIB) $(UTILS_LIB)
@@ -23,4 +23,4 @@ dynloadcores: timesortfile dynloadcores.cpp $(SORT_LIB) $(UTILS_LIB)
 
 clean:
 	cd ../utils; make clean; cd ../timing
-	rm -f timesortfile input.data
+	rm -f timesortfile input.data dynloadcores
