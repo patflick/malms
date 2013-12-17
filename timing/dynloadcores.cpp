@@ -11,19 +11,14 @@
  *  			are loaded and not loaded.
  *				Target PID is defined via commandline argument.
  */
- 
-// defines weather information is send to MALMS or not
-#define SENDINFO 1
-#define BLOCK_CYCLE_MICROSEC 100000L;
-#define ARG_INFO "info"
-#define ARG_NOINFO "noinfo"
- 
+
 // exec and fork
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
+// other C/C++ includes
 #include <vector>
 #include <cstring>
 #include <iostream>
@@ -40,22 +35,20 @@
 // threading
 #include <boost/thread.hpp>
 
-// GCC Atomics:
-// Check for g++ version >= 4.5
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
-#include <atomic>
-#else
-// Check for g++ version >= 4.4
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
+// Atomics (GCC 4.4 supports atomics using <cstdatomic>
+// as of 4.5 it's <atomic>)
+#if __GNUC__ == 4 && __GNUC_MINOR__ == 4
 #include <cstdatomic>
 #else
-#error "g++ version < 4.4 is not supported"
-// todo add file for atomics for g++ < 4.4
-#endif
+#include <atomic>
 #endif
 
 // Signal to be waited on before loading cores
 #define SIGSTARTBLOCKCORES SIGRTMIN+4
+
+// commandline argument names
+#define ARG_INFO "info"
+#define ARG_NOINFO "noinfo"
 
 // thread work function memory size per 1000x ints (10000 = 40 MB)
 #define THREAD_WORK_MEM 10000
@@ -71,13 +64,15 @@ std::vector<boost::mutex*> thread_mutex;
 std::atomic<bool>* thread_active;
 std::atomic<bool>* thread_quit;
 std::atomic<int>* thread_work_counter;
-int** thread_work_mem;
 std::atomic<int> numthreads_sleeping;
 std::atomic<bool> quit;
 std::atomic<pid_t> pidofsort;
 std::atomic<int> p;
 std::atomic<bool> send_info;
 std::atomic<long long> block_cycle_nanosec;
+
+int** thread_work_mem;
+std::atomic<int> load_pattern;
 
 void pin_to_core(int cpuid) {
 	cpu_set_t set;
@@ -204,53 +199,134 @@ void controlthreadfunc() {
 	// get pid
 	pid_t pid = pidofsort;
 	
-	// start blocking cores
-	loadcore(1, pid);
-	loadcore(2, pid);
-	//loadcore(4, pid);
-	//loadcore(6, pid);
-	//nanosleep(&req,NULL);
-	
-	while (true) {
+	if (load_pattern == 1) {
+		// Pattern 1:
+		//     0 1 2 3
+		//    | |x|x| |
+		//    |x|x|x| |
+		//    |x| | | |
+		//     . . .
 		
-		nanosleep(&req,NULL);
-		if (quit) break;
-		
-	        loadcore(0, pid);
-		//loadcore(4, pid);
-		//unloadcore(3, pid);
-		//unloadcore(7, pid);
-		
-		nanosleep(&req,NULL);
-		if (quit) break;
-		
-		//loadcore(1, pid);
-		//loadcore(5, pid);
-		unloadcore(1, pid);
-		unloadcore(2, pid);
-		
-		nanosleep(&req,NULL);
-		if (quit) break;
-		
+		// start blocking cores
 		loadcore(1, pid);
 		loadcore(2, pid);
-		//loadcore(7, pid);
-		unloadcore(0, pid);
-		//unloadcore(5, pid);
 		
-		nanosleep(&req,NULL);
-		if (quit) break;
+		while (true) {
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(0, pid);
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			unloadcore(1, pid);
+			unloadcore(2, pid);
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(1, pid);
+			loadcore(2, pid);
+			unloadcore(0, pid);
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+		}
+	} else if (load_pattern == 2) {
+
+		// Pattern 2
+		//    0 1 2 3 4 5 6 7
+		//   |x| | | |x| |x| |
+		//   |x| |x| | | |x| |
+		//   |x| |x| |x| | | |
+		//   | | |x| |x| |x| |
 		
-		//loadcore(3, pid);
-		//loadcore(7, pid);
-		//unloadcore(2, pid);
-		//unloadcore(6, pid);
-		//unloadcore(6, pid);
+		
+		// start blocking cores
+		loadcore(0, pid);
+		loadcore(4, pid);
+		loadcore(6, pid);
+		
+		while (true) {
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(2, pid);
+			unloadcore(4, pid);
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(4, pid);
+			unloadcore(6, pid);
+
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(6, pid);
+			unloadcore(0, pid);
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(0, pid);
+			unloadcore(2, pid);
+		}
+	} else if (load_pattern == 3) {
+		// Pattern 3
+		//    0 1 2 3 4 5 6 7
+		//   |x| | | |x| | | |
+		//   | |x| | | |x| | |
+		//   | | |x| | | |x| |
+		//   | | | |x| | | |x|
+		
+		
+		// start blocking cores
+		loadcore(0, pid);
+		loadcore(4, pid);
+		
+		while (true) {
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(1, pid);
+			loadcore(5, pid);
+			unloadcore(0, pid);
+			unloadcore(4, pid);
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(2, pid);
+			loadcore(6, pid);
+			unloadcore(1, pid);
+			unloadcore(5, pid);
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(3, pid);
+			loadcore(7, pid);
+			unloadcore(2, pid);
+			unloadcore(6, pid);
+			
+			nanosleep(&req,NULL);
+			if (quit) break;
+			
+			loadcore(0, pid);
+			loadcore(4, pid);
+			unloadcore(3, pid);
+			unloadcore(7, pid);
+		}
 	}
 	
 	// quit working threads
 	// has to be done here to prevent deadlock
-	for (unsigned int i = 0; i < p; i++) {
+	for (int i = 0; i < p; i++) {
 		thread_quit[i] = true;
 		if (!thread_active[i]) {
 			{
@@ -263,32 +339,47 @@ void controlthreadfunc() {
 	}
 }
 
+void printUsage() {
+	std::cerr << "Usage: ./dynloadcores <info/noinfo> <block_cycle> <pattern> ./timesortfile [SORT OPTIONS]" << std::endl;
+	std::cerr << "   where" << std::endl;
+	std::cerr << "   <info/noinfo>     Set to `info` to send the loaded core info to the malleable scheduler, otherwise set to `noinfo`" << std::endl;
+	std::cerr << "   <block_cycle>     Duration of each block in the dynamic load pattern (in nanoseconds)" << std::endl;
+	std::cerr << "   <pattern>         The load pattern to use (either 1, 2, or 3)" << std::endl;
+}
 
 // usage: ./dynloadcores [info/noinfo] [Cyles in NanoSecs] ./timesortfile [SORT OPTIONS]
 int main(int argc, char* argv[]) {
+	if (argc < 5) {
+		printUsage();
+		exit(EXIT_FAILURE);
+	}
+
 	// read input arguments
 	if (strcmp(argv[1],ARG_INFO)==0) {
 		send_info = true;
 	} else if (strcmp(argv[1],ARG_NOINFO)==0) {
 		send_info = false;
 	} else {
-		std::cout << "Wrong Usage, you are doing it wrong!" << std::endl;
-		return 0;
+		printUsage();
+		exit(EXIT_FAILURE);
 	}
-	
 	block_cycle_nanosec = atol(argv[2]);
 	if (block_cycle_nanosec == 0) {
-		std::cout << "Wrong Usage, you are doing it wrong!" << std::endl;
-		return 0;
+		printUsage();
+		exit(EXIT_FAILURE);
+	}
+	load_pattern = atoi(argv[3]);
+	if (!(load_pattern == 1 || load_pattern == 2 || load_pattern == 3)) {
+		printUsage();
+		exit(EXIT_FAILURE);
 	}
 	
-	
 	// prepare arguments for call of "timesortfile"
-	int argc_sort = argc-1;
+	int argc_sort = argc-4+2;
 	char* argv_sort[argc_sort+1];
 	argv_sort[argc_sort] = NULL;
-	for (int i = 3; i < argc-1; i++) {
-		argv_sort[i-3] = argv[i];
+	for (int i = 4; i < argc-1; i++) {
+		argv_sort[i-4] = argv[i];
 	}
 	argv_sort[argc_sort-3] = "-p";
 	char spid[6];
@@ -313,7 +404,7 @@ int main(int argc, char* argv[]) {
 	boost::thread control_thread(&controlthreadfunc);
 	
 	// init mutexes and cond-vars and start threads
-	for (unsigned int i = 0; i < p; i++) {
+	for (int i = 0; i < p; i++) {
 		thread_cd[i] = new boost::condition_variable();
 		thread_mutex[i] = new boost::mutex();
 		thread_active[i] = false;
@@ -338,7 +429,6 @@ int main(int argc, char* argv[]) {
 		nanosleep(&req, NULL);
 	}
 	
-
 	
 	// call timesortfile with arguments provided
 	pid_t pid = fork();
@@ -347,7 +437,7 @@ int main(int argc, char* argv[]) {
 		std::cout << "fork() failed" << std::endl;
 		exit(1);
 	} else if (pid == 0) {
-		execv(argv[3],argv_sort);
+		execv(argv[4],argv_sort);
 		std::cout << "execv() failed" << std::endl;
 		exit(1);
 	}
@@ -358,14 +448,14 @@ int main(int argc, char* argv[]) {
 	
 	// quit all threads
 	quit = true;
-	for (unsigned int i = 0; i < p; i++) {
+	for (int i = 0; i < p; i++) {
 		threads[i]->join();
 	}
 	control_thread.join();
 	
 	// get sum of work counters
 	unsigned long long aggr_work_counter = 0;
-	for (unsigned int i = 0; i < p; i++) {
+	for (int i = 0; i < p; i++) {
 		aggr_work_counter += thread_work_counter[i];
 	}
 	// print number of work done

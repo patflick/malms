@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
 			++i;
 			pid = atoi(argv[i]);
 		} else if (strcmp(argv[i],ARG_K)==0) {
-			// "-k" number of workpakets
+			// "-k" number of workpakets for MALMS/threads for MCSTL
 			++i;
 			k = atoi(argv[i]);
 		} else if (strcmp(argv[i],ARG_C)==0) {
@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
 		}
 		++i;
 	}
-	if (k == 0) {
+	if (a == MALMS && k == 0) {
 		printUsage();
 		return 0;
 	}
