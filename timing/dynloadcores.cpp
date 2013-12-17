@@ -57,10 +57,12 @@
 // Signal to be waited on before loading cores
 #define SIGSTARTBLOCKCORES SIGRTMIN+4
 
-//Speicherparameter je 1000 ints
-#define ACKERGROESSE 10000
-#define PARZELLENGROESSE 25
-#define WIEDERHOLUNGEN 2
+// thread work function memory size per 1000x ints (10000 = 40 MB)
+#define THREAD_WORK_MEM 10000
+// threads work through tiles in their work mem, size per 1000x ints (25 = 100 kB)
+#define TILE_SIZE 25
+// number of times each tile gets repeated (lowers mem load through caching)
+#define TILE_REPEAT 2
 
 
 std::vector<boost::thread*> threads;
@@ -69,7 +71,7 @@ std::vector<boost::mutex*> thread_mutex;
 std::atomic<bool>* thread_active;
 std::atomic<bool>* thread_quit;
 std::atomic<int>* thread_work_counter;
-int** thread_acker;
+int** thread_work_mem;
 std::atomic<int> numthreads_sleeping;
 std::atomic<bool> quit;
 std::atomic<pid_t> pidofsort;
@@ -98,12 +100,11 @@ void block_all_signals() {
 	pthread_sigmask(SIG_BLOCK, &sigset, NULL);
 }
 
-void dowork(int z, int* acker) {
+void dowork_mem(int z, int* work_mem) {
 	unsigned int c = 0;
 	for (unsigned int i = 0; i < 1000; i++) {
-		// non memory intensive work
-		// cannot be optimized by compiler
-		acker[z] = (++c + acker[z]) % 13;
+		// memory intensive work
+		work_mem[z] = (++c + work_mem[z]) % 13;
 		z++;
 	}
 }
@@ -120,7 +121,7 @@ void thread_func(int coreid) {
 		numthreads_sleeping++;
 		thread_cd[coreid]->wait(lock);
 	}
-	int* acker = thread_acker[coreid];
+	int* work_mem = thread_work_mem[coreid];
 	while (true) {
 		if (!thread_active[coreid]) {
 			if (thread_quit[coreid]) {
@@ -131,7 +132,7 @@ void thread_func(int coreid) {
 			{ // synchronized
 				boost::unique_lock<boost::mutex> lock(*thread_mutex[coreid]);
 				if (!thread_active[coreid]) {
-					thread_cd[coreid]->wait(lock);	
+					thread_cd[coreid]->wait(lock);
 				}
 			}
 			if (thread_quit[coreid]) {
@@ -139,8 +140,8 @@ void thread_func(int coreid) {
 				return;
 			}
 		}else{
-			z=((work_counter % PARZELLENGROESSE) + (work_counter / (PARZELLENGROESSE*WIEDERHOLUNGEN))*PARZELLENGROESSE)%ACKERGROESSE;
-			dowork(1000*z, acker);
+			z=((work_counter % TILE_SIZE) + (work_counter / (TILE_SIZE*TILE_REPEAT))*TILE_SIZE)%THREAD_WORK_MEM;
+			dowork_mem(1000*z, work_mem);
 			work_counter++;
 		}
 		
@@ -291,18 +292,10 @@ int main(int argc, char* argv[]) {
 	}
 	argv_sort[argc_sort-3] = "-p";
 	char spid[6];
-	sprintf(spid, "%u", getpid()); 
+	sprintf(spid, "%u", getpid());
 	argv_sort[argc_sort-2] = spid;
 	argv_sort[argc_sort-1] = argv[argc-1];
 	
-	// echo sort parameters
-	/*
-	for (int i = 0; i < argc_sort; i++) {
-		std::cout << argv_sort[i] << " ";
-	}
-	std::cout << std::endl;
-	*/
-
 	
 	// init thread/synchronization variables
 	p = boost::thread::hardware_concurrency();
@@ -312,11 +305,10 @@ int main(int argc, char* argv[]) {
 	thread_active = new std::atomic<bool>[p];
 	thread_quit = new std::atomic<bool>[p];
 	thread_work_counter = new std::atomic<int>[p];
-	thread_acker = new int*[p];
+	thread_work_mem = new int*[p];
 	numthreads_sleeping = 0;
 	quit = false;
 	pidofsort = 0;
-	int n = ACKERGROESSE*1000;
 	// start control thread
 	boost::thread control_thread(&controlthreadfunc);
 	
@@ -326,12 +318,14 @@ int main(int argc, char* argv[]) {
 		thread_mutex[i] = new boost::mutex();
 		thread_active[i] = false;
 		thread_work_counter[i] = 0;
+		// create and init thread work mem
+		thread_work_mem[i] = new int[1000*THREAD_WORK_MEM];
+		for (int j=0;j<1000*THREAD_WORK_MEM;j++) thread_work_mem[i][j]=0;
+		
+		// start threads
 		thread_quit[i] = false;
 		threads[i] = new boost::thread(&thread_func, i);
 		
-		//erstelle Aecker
-		thread_acker[i] = new int[n];
-		for (int j=0;j<n;j++) thread_acker[i][j]=0;
 	}
 	
 	block_all_signals();
@@ -347,7 +341,6 @@ int main(int argc, char* argv[]) {
 
 	
 	// call timesortfile with arguments provided
-	//pid_t pid = 1;
 	pid_t pid = fork();
 	pidofsort = pid;
 	if (pid == -1) {
