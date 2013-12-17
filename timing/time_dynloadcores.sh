@@ -1,5 +1,10 @@
 #!/bin/bash
-# Bash Script to Test/Time MCSTL vs MALMS during cpu hotplugging
+# Bash Script to Test/Time MCSTL, MALMS, and TBB for dynamic load patterns
+# 
+# Usage: bash time_dynloadcores.sh <WP> <BLOCK_CYCLE> <PATTERN>
+#    <WP>            number of MALMS work packages
+#    <BLOCK_CYCLE>   Duration of blocks in pattern in microseconds
+#    <PATTERN>       The pattern to use, (either 1, 2, or 3)
 
 
 # ------------------------------------------------------- #
@@ -39,7 +44,7 @@ fi
 OUTPUTNAME=dynload_P${LOAD_PATTERN}_${BLOCK_CYCLE_MICROSEC}µs_wp${WP}.csv
 
 # Number of Repitions of the Tests
-REPEAT=10
+REPEAT=100
 
 
 

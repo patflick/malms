@@ -29,7 +29,7 @@ fi
 OUTPUTNAME=noload_wp$WP.csv
 
 # Number of Repitions of the Tests
-REPEAT=50
+REPEAT=100
 
 
 
@@ -58,7 +58,6 @@ do
 
 	# Generate Sorting input
 	$UTILS_DIR/generatesortinput -n $size -t $INPUT_TYPE input.data
-	
 
 	for ((cores=$MIN_CORES; cores<=$MAX_CORES; cores++))
 	do
@@ -68,7 +67,7 @@ do
 		do
 			# Preparing new csv row
 			echo -n "$cores;$size;" >> $OUTPUT
-			for algo in malms mcstl stdsort
+			for algo in malms mcstl tbbsort stdsort
 			do
 				# Starting Process that waits for the Signal from the Sort Process
 				$UTILS_DIR/waitforsignal &
@@ -83,6 +82,8 @@ do
 					./timesortfile -k $WP -c $malmscores -a $algo -p $PID_OF_WAIT input.data >> $OUTPUT &
 				elif [ "$algo" = "stdsort" ]; then
 					./timesortfile -k $cores -a $algo -p $PID_OF_WAIT input.data >> $OUTPUT &
+				elif [ "$algo" = "tbbsort" ]; then
+					./timesortfile -a $algo -p $PID_OF_WAIT input.data >> $OUTPUT &
 				fi
 				PID_OF_SORT=$!
 
